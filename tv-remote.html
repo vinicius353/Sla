@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Universal Remote</title>
+<style>
+  :root{
+    --bg:#101214;
+    --panel:#181b1e;
+    --panel-2:#1f2327;
+    --edge:#2a2f34;
+    --text:#eef1f3;
+    --sub:#8b939b;
+    --accent:#ffb454;   /* warm amber — the "power" glow */
+    --accent-dim:#5c4a2c;
+    --danger:#ff6b5e;
+    --ok:#5ed48b;
+    --brand:#ffb454;
+    --radius:18px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overscroll-behavior:none; height:100%;}
+  body{padding-bottom:env(safe-area-inset-bottom); user-select:none;}
+
+  .wrap{max-width:480px;margin:0 auto;padding:14px 14px calc(24px + env(safe-area-inset-bottom));}
+
+  /* ---------- Header / brand switcher ---------- */
+  header{padding:10px 2px 16px;}
+  h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--sub);
+    font-weight:600;margin:0 0 12px;text-align:center;}
+
+  .brands{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .brand-btn{
+    background:var(--panel);border:1px solid var(--edge);border-radius:12px;
+    padding:10px 4px;text-align:center;color:var(--sub);font-size:12px;font-weight:700;
+    letter-spacing:.03em; cursor:pointer;
+  }
+  .brand-btn small{display:block;font-size:9px;font-weight:500;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--sub);margin-top:2px;}
+  .brand-btn.active{border-color:var(--brand-color,var(--accent));color:var(--text);
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    box-shadow:0 0 0 1px var(--brand-color,var(--accent)) inset;}
+  .swatch{width:16px;height:16px;border-radius:5px;margin:0 auto 6px;background:var(--brand-color,#888);}
+
+  /* ---------- Connection bar ---------- */
+  .conn{background:var(--panel);border:1px solid var(--edge);border-radius:14px;
+    padding:12px;margin-top:14px;}
+  .conn-row{display:flex;gap:8px;align-items:center;}
+  .conn input{flex:1;background:var(--panel-2);border:1px solid var(--edge);color:var(--text);
+    padding:11px 12px;border-radius:10px;font-size:15px;min-width:0;}
+  .conn button{background:var(--brand-color,var(--accent));color:#151719;border:none;
+    padding:11px 16px;border-radius:10px;font-weight:700;font-size:14px;white-space:nowrap;}
+  .conn button:disabled{opacity:.5;}
+  .status-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:var(--sub);}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--sub);flex:none;}
+  .dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok);}
+  .dot.err{background:var(--danger);box-shadow:0 0 8px var(--danger);}
+  .hint{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.5;}
+  .hint b{color:var(--text);}
+
+  /* ---------- Remote body ---------- */
+  .remote{margin-top:16px;background:linear-gradient(180deg,#1c2024,#141618);
+    border:1px solid var(--edge);border-radius:26px;padding:18px 16px 22px;}
+
+  .row{display:flex;gap:10px;margin-bottom:10px;}
+  .row:last-child{margin-bottom:0;}
+
+  button.key{
+    flex:1;background:var(--panel);border:1px solid var(--edge);color:var(--text);
+    border-radius:14px;padding:16px 8px;font-size:13px;font-weight:700;letter-spacing:.02em;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    min-height:52px;
+  }
+  button.key:active{background:var(--panel-2);transform:scale(.96);}
+  button.key svg{width:20px;height:20px;stroke:var(--text);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  button.key.power{background:var(--danger);color:#1a0906;border-color:var(--danger);}
+  button.key.power svg{stroke:#1a0906;}
+  button.key.wide{flex:2;}
+  button.key.ghost{background:transparent;}
+
+  .dpad{position:relative;width:100%;aspect-ratio:1/1;max-width:260px;margin:6px auto 4px;
+    display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:6px;}
+  .dpad button{background:var(--panel);border:1px solid var(--edge);color:var(--text);border-radius:14px;}
+  .dpad button:active{background:var(--panel-2);}
+  .dpad .up{grid-column:2;grid-row:1;}
+  .dpad .left{grid-column:1;grid-row:2;}
+  .dpad .ok{grid-column:2;grid-row:2;background:var(--brand-color,var(--accent));color:#151719;font-weight:800;}
+  .dpad .right{grid-column:3;grid-row:2;}
+  .dpad .down{grid-column:2;grid-row:3;}
+  .dpad svg{width:22px;height:22px;margin:auto;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;display:block;}
+
+  .divider{height:1px;background:var(--edge);margin:14px 2px;}
+
+  .apps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
+  .apps button{background:var(--panel);border:1px solid var(--edge);color:var(--sub);
+    border-radius:12px;padding:10px 4px;font-size:12px;font-weight:700;}
+  .apps button:active{color:var(--text);}
+
+  .log{margin-top:14px;background:#0c0e10;border:1px solid var(--edge);border-radius:12px;
+    padding:10px 12px;font-size:11px;color:var(--sub);font-family:ui-monospace,Menlo,monospace;
+    max-height:110px;overflow-y:auto;}
+  .log div{white-space:pre-wrap;word-break:break-word;padding:1px 0;}
+
+  details.help{margin-top:16px;background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:2px 14px;}
+  details.help summary{padding:12px 0;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;}
+  details.help .body{padding-bottom:14px;font-size:13px;color:var(--sub);line-height:1.6;}
+  details.help .body b{color:var(--text);}
+  details.help .body ol,details.help .body ul{padding-left:18px;margin:6px 0;}
+
+  .note{font-size:11px;color:var(--sub);text-align:center;margin-top:16px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Universal Remote</h1>
+    <div class="brands" id="brandBar"></div>
+  </header>
+
+  <div class="conn">
+    <div class="conn-row">
+      <input id="ipInput" inputmode="decimal" placeholder="TV IP address, e.g. 192.168.1.42">
+      <button id="connectBtn">Connect</button>
+    </div>
+    <div class="status-row">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">Not connected</span>
+    </div>
+    <div class="hint" id="brandHint"></div>
+    <div class="conn-row" id="pinRow" style="display:none; margin-top:10px;">
+      <input id="pinInput" inputmode="numeric" maxlength="8" placeholder="Código exibido na TV">
+      <button id="pinSubmitBtn">Parear</button>
+    </div>
+  </div>
+
+  <div class="remote" id="remote">
+    <div class="row">
+      <button class="key power" id="btnPower"><svg viewBox="0 0 24 24"><path d="M12 2v9"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>Power</button>
+      <button class="key" id="btnMute"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>Mute</button>
+      <button class="key" id="btnInput"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="12" rx="2"/><path d="M8 7V4h8v3"/></svg>Input</button>
+    </div>
+
+    <div class="row">
+      <button class="key" id="btnVolUp">Vol +</button>
+      <button class="key" id="btnChUp">Ch +</button>
+    </div>
+    <div class="row">
+      <button class="key" id="btnVolDown">Vol −</button>
+      <button class="key" id="btnChDown">Ch −</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="dpad">
+      <button class="up" id="btnUp"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg></button>
+      <button class="left" id="btnLeft"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button class="ok" id="btnOk">OK</button>
+      <button class="right" id="btnRight"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button class="down" id="btnDown"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button class="key" id="btnBack"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
+      <button class="key" id="btnHome"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Home</button>
+    </div>
+
+    <div class="apps">
+      <button data-app="netflix">Netflix</button>
+      <button data-app="youtube">YouTube</button>
+      <button data-app="prime">Prime Video</button>
+    </div>
+
+    <div class="log" id="log"><div>Pick a brand and connect to begin.</div></div>
+  </div>
+
+  <details class="help">
+    <summary>How this works &amp; troubleshooting</summary>
+    <div class="body" id="helpBody"></div>
+  </details>
+
+  <div class="note">Runs entirely in your browser — no data leaves your phone except direct messages<br>to your TV over your own Wi-Fi network.</div>
+</div>
+
+<script>
+/* =========================================================================
+   BRAND DEFINITIONS
+   Each brand has its own local-network control protocol. Real logos can't
+   be embedded here (they're trademarked), so each brand gets a simple
+   colored badge matching its real brand color instead.
+   ========================================================================= */
+const BRANDS = {
+  lg: {
+    label: "LG", sub: "WebOS", color: "#a50034", defaultPort: "3000",
+    hint: "LG webOS TVs (2014+). On the TV: make sure it's on the same Wi-Fi. First connect, a numeric code appears on the TV screen — type it below to pair.",
+    help: `<b>LG webOS</b> uses a protocol called SSAP over a local
+      WebSocket. This page tries the plain connection (port 3000) first,
+      and if the TV doesn't answer there, it automatically retries on the
+      secure port (3001) — you'll see both attempts in the log box.<br><br>
+      On first successful connect, the TV displays a pairing code on
+      screen — a box appears below the Connect button here; type the code
+      from the TV and tap <b>Parear</b> to finish pairing.<br><br>
+      <b>If both attempts fail</b> (log shows connection closed right
+      away): mobile browsers block the TV's secure port by default because
+      it uses a self-signed certificate. Open <b>https://TV-IP:3001</b>
+      directly in a new browser tab first, accept the certificate warning
+      there, then come back to this page and tap Connect again.`
+  },
+  samsung: {
+    label: "Samsung", sub: "Tizen", color: "#1428a0", defaultPort: "8002",
+    hint: "Samsung Smart TVs (2016+, Tizen). Make sure the TV is on and on the same Wi-Fi. First connect, allow the pairing prompt that appears on the TV screen.",
+    help: `<b>Samsung Tizen</b> TVs expose a WebSocket remote-control channel
+      on wss://TV-IP:8002. The TV will pop up an allow/deny prompt the first
+      time you connect — accept it there. Reconnecting later may ask again
+      since this page doesn't store the pairing token between sessions.`
+  },
+  roku: {
+    label: "Roku", sub: "ECP", color: "#662d91", defaultPort: "8060",
+    hint: "Roku TVs / players. Find the IP under Settings → Network → About. No pairing needed — Roku's control API is open on your local network.",
+    help: `<b>Roku</b> uses a simple, unauthenticated HTTP API (External
+      Control Protocol) on port 8060 — no pairing step required. This is
+      the most reliable brand here since it doesn't need a secure
+      handshake.`
+  },
+  other: {
+    label: "Other", sub: "Generic", color: "#5b6672", defaultPort: "",
+    hint: "Sony, Vizio, TCL, Hisense, Philips, etc. each use their own local API and most require a pairing PIN entered on the TV that this simplified page doesn't collect.",
+    help: `<b>Other brands</b> (Sony Bravia, Vizio, TCL/Hisense Roku-based
+      sets, Philips) each expose different local-network protocols, and most
+      need a device-specific PIN or pre-shared key set up in the TV's menu
+      first. This page can't cover all of them, but the buttons below will
+      still work if you fill in the matching endpoint pattern for your model —
+      look up "<i>[your TV brand] local network remote API</i>" for the exact one.
+      If your TV came with a Roku, Google TV, Fire TV, or Apple TV box built
+      in or attached, use that brand's own official app instead — it will be
+      far more reliable than a browser-based remote.`
+  }
+};
+
+let currentBrand = "lg";
+let ip = "";
+let ws = null;               // primary control socket
+let pointerWs = null;        // LG pointer/button socket
+let lgClientKey = null;      // kept in memory only, this session
+let samsungToken = null;     // kept in memory only, this session
+
+const $ = id => document.getElementById(id);
+const logEl = $("log");
+function log(msg){
+  const d = document.createElement("div");
+  d.textContent = msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setStatus(state, text){
+  $("statusDot").className = "dot" + (state ? " " + state : "");
+  $("statusText").textContent = text;
+}
+
+/* ---------- Brand switcher UI ---------- */
+function renderBrandBar(){
+  const bar = $("brandBar");
+  bar.innerHTML = "";
+  Object.entries(BRANDS).forEach(([key, b]) => {
+    const btn = document.createElement("div");
+    btn.className = "brand-btn" + (key === currentBrand ? " active" : "");
+    btn.style.setProperty("--brand-color", b.color);
+    btn.innerHTML = `<div class="swatch" style="background:${b.color}"></div>${b.label}<small>${b.sub}</small>`;
+    btn.onclick = () => selectBrand(key);
+    bar.appendChild(btn);
+  });
+}
+function selectBrand(key){
+  currentBrand = key;
+  const b = BRANDS[key];
+  document.documentElement.style.setProperty("--brand-color", b.color);
+  $("ipInput").placeholder = `${b.label} TV IP address, e.g. 192.168.1.42`;
+  $("brandHint").textContent = b.hint;
+  $("helpBody").innerHTML = b.help;
+  renderBrandBar();
+  teardown();
+  setStatus("", "Not connected");
+}
+
+/* ---------- Connect / disconnect ---------- */
+$("connectBtn").onclick = () => {
+  ip = $("ipInput").value.trim();
+  if (!ip){ log("Enter your TV's IP address first."); return; }
+  if (ws || pointerWs){ teardown(); return; }
+  if (currentBrand === "lg") connectLG();
+  else if (currentBrand === "samsung") connectSamsung();
+  else if (currentBrand === "roku") connectRoku();
+  else log("Pick LG, Samsung, or Roku above for a working live connection, or see the Help section for other brands.");
+};
+
+function teardown(){
+  if (ws){ try{ ws.close(); }catch(e){} ws = null; }
+  if (pointerWs){ try{ pointerWs.close(); }catch(e){} pointerWs = null; }
+  $("connectBtn").textContent = "Connect";
+}
+
+/* =========================================================================
+   LG webOS (SSAP over WebSocket)
+   ========================================================================= */
+const LG_MANIFEST = {
+  manifestVersion: 1,
+  permissions: [
+    "LAUNCH","LAUNCH_WEBAPP","APP_TO_APP","CLOSE","TEST_OPEN","TEST_PROTECTED",
+    "CONTROL_AUDIO","CONTROL_DISPLAY","CONTROL_INPUT_JOYSTICK","CONTROL_INPUT_MEDIA_RECORDING",
+    "CONTROL_INPUT_MEDIA_PLAYBACK","CONTROL_INPUT_TV","CONTROL_POWER","READ_APP_STATUS",
+    "READ_CURRENT_CHANNEL","READ_INPUT_DEVICE_LIST","READ_NETWORK_STATE","READ_RUNNING_APPS",
+    "READ_TV_CHANNEL_LIST","WRITE_NOTIFICATION_TOAST","READ_POWER_STATE","READ_COUNTRY_INFO"
+  ]
+};
+
+function connectLG(){
+  setStatus("", "Conectando…");
+  tryLgSocket(3000, false);
+}
+
+function lgRegisterMsg(){
+  return JSON.stringify({
+    type: "register",
+    id: "register_0",
+    payload: {
+      forcePairing: false,
+      pairingType: "PIN",
+      manifest: LG_MANIFEST,
+      ...(lgClientKey ? { "client-key": lgClientKey } : {})
+    }
+  });
+}
+
+function tryLgSocket(port, isRetry){
+  const scheme = port === 3001 ? "wss" : "ws";
+  log(`LG: tentando ${scheme}://${ip}:${port}…`);
+  ws = new WebSocket(`${scheme}://${ip}:${port}`);
+  let opened = false;
+
+  ws.onopen = () => { opened = true; ws.send(lgRegisterMsg()); };
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === "registered"){
+      lgClientKey = msg.payload["client-key"];
+      hidePinInput();
+      setStatus("ok", "Conectado à TV LG");
+      $("connectBtn").textContent = "Desconectar";
+      log("LG: pareado e conectado.");
+      openLgPointerSocket();
+    } else if (msg.payload && msg.payload.pairingType === "PIN"){
+      setStatus("", "Digite o código exibido na TV");
+      log("LG: um código apareceu na tela da TV — digite-o abaixo.");
+      showPinInput();
+    } else if (msg.payload && msg.payload.pairingType === "PROMPT"){
+      setStatus("", "Aceite a solicitação na TV…");
+      log("LG: aceite a conexão na tela da TV.");
+    } else if (msg.type === "error"){
+      setStatus("err", "Erro na TV LG");
+      log("Erro LG: " + JSON.stringify(msg.error || msg));
+    }
+  };
+
+  ws.onerror = () => {
+    if (!(!opened && !isRetry && port === 3000)){
+      setStatus("err", "Falha na conexão");
+      log("LG: falha ao conectar. Veja a Ajuda abaixo.");
+    }
+  };
+
+  ws.onclose = (ev) => {
+    // If the very first attempt (plain port 3000) never opened, this TV
+    // likely requires the secure port instead — retry once automatically.
+    if (!opened && !isRetry && port === 3000){
+      log(`LG: porta 3000 não respondeu (código ${ev.code}). Tentando porta segura 3001…`);
+      tryLgSocket(3001, true);
+      return;
+    }
+    if ($("statusDot").className.indexOf("err") === -1){
+      setStatus("err", "Não foi possível conectar");
+    }
+    log(`LG: conexão encerrada (código ${ev.code}${ev.reason ? ", " + ev.reason : ""}).`);
+    $("connectBtn").textContent = "Connect";
+    hidePinInput();
+  };
+}
+
+function showPinInput(){
+  $("pinRow").style.display = "flex";
+  $("pinInput").value = "";
+  $("pinInput").focus();
+}
+function hidePinInput(){
+  $("pinRow").style.display = "none";
+}
+function submitLgPin(){
+  const pin = $("pinInput").value.trim();
+  if (!pin){ log("Digite o código mostrado na TV."); return; }
+  if (!ws || ws.readyState !== 1){ log("Conexão perdida — tente conectar de novo."); return; }
+  ws.send(JSON.stringify({
+    type: "request",
+    id: "setPin_" + Math.random().toString(36).slice(2),
+    uri: "ssap://pairing/setPin",
+    payload: { pin }
+  }));
+  log("Código enviado, aguardando confirmação da TV…");
+}
+$("pinSubmitBtn").onclick = submitLgPin;
+$("pinInput").addEventListener("keydown", (e) => { if (e.key === "Enter") submitLgPin(); });
+
+function openLgPointerSocket(){
+  sendLg("ssap://com.webos.service.networkinput/getPointerInputSocket", {}, (res) => {
+    if (res.returnValue && res.socketPath){
+      pointerWs = new WebSocket(res.socketPath);
+      pointerWs.onopen = () => log("LG: button channel ready.");
+    }
+  });
+}
+function sendLg(uri, payload, cb){
+  if (!ws || ws.readyState !== 1) return;
+  const id = "req_" + Math.random().toString(36).slice(2);
+  if (cb) {
+    const handler = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.id === id){ ws.removeEventListener("message", handler); cb(msg.payload || {}); }
+    };
+    ws.addEventListener("message", handler);
+  }
+  ws.send(JSON.stringify({ type: "request", id, uri, payload: payload || {} }));
+}
+function lgButton(name){
+  if (pointerWs && pointerWs.readyState === 1){
+    pointerWs.send(`type:button\nname:${name}\n\n`);
+  }
+}
+
+/* =========================================================================
+   Samsung Tizen (WebSocket remote-control channel)
+   ========================================================================= */
+function connectSamsung(){
+  setStatus("", "Connecting…");
+  const name = btoa("WebRemote");
+  const tokenParam = samsungToken ? `&token=${samsungToken}` : "";
+  ws = new WebSocket(`wss://${ip}:8002/api/v2/channels/samsung.remote.control?name=${name}${tokenParam}`);
+  ws.onopen = () => setStatus("", "Accept the prompt on your TV…");
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.event === "ms.channel.connect"){
+      if (msg.data && msg.data.token) samsungToken = msg.data.token;
+      setStatus("ok", "Connected to Samsung TV");
+      $("connectBtn").textContent = "Disconnect";
+      log("Samsung: connected.");
+    } else if (msg.event === "ms.channel.timeOut" || msg.event === "ms.channel.unauthorized"){
+      setStatus("err", "Rejected on TV");
+      log("Samsung: connection was denied or timed out on the TV.");
+    }
+  };
+  ws.onerror = () => { setStatus("err", "Connection failed"); log("Samsung: connection failed. Check the IP and that HTTPS/wss isn't blocked."); };
+  ws.onclose = () => { setStatus("", "Not connected"); $("connectBtn").textContent = "Connect"; };
+}
+function samsungKey(key){
+  if (!ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({
+    method: "ms.remote.control",
+    params: { Cmd: "Click", DataOfCmd: key, Option: "false", TypeOfRemote: "SendRemoteKey" }
+  }));
+}
+
+/* =========================================================================
+   Roku (HTTP External Control Protocol — no pairing needed)
+   ========================================================================= */
+function connectRoku(){
+  setStatus("", "Checking…");
+  fetch(`http://${ip}:8060/query/device-info`, { mode: "no-cors" })
+    .then(() => {
+      setStatus("ok", "Connected to Roku");
+      $("connectBtn").textContent = "Disconnect";
+      ws = { readyState: 1, roku: true };  // marker so teardown/UI logic works
+      log("Roku: ready (no pairing required).");
+    })
+    .catch(() => { setStatus("err", "Connection failed"); log("Roku: couldn't reach the device on port 8060."); });
+}
+function rokuKey(key){
+  fetch(`http://${ip}:8060/keypress/${key}`, { method: "POST", mode: "no-cors" }).catch(() => {});
+}
+function rokuLaunch(appId){
+  fetch(`http://${ip}:8060/launch/${appId}`, { method: "POST", mode: "no-cors" }).catch(() => {});
+}
+
+/* =========================================================================
+   Unified button wiring — routes each press to the active brand's protocol
+   ========================================================================= */
+const ACTIONS = {
+  power:   { lg: () => sendLg("ssap://system/turnOff"), samsung: () => samsungKey("KEY_POWER"), roku: () => rokuKey("Power") },
+  mute:    { lg: () => sendLg("ssap://audio/setMute", { mute: true }), samsung: () => samsungKey("KEY_MUTE"), roku: () => rokuKey("VolumeMute") },
+  input:   { lg: () => sendLg("ssap://tv/switchInput", { inputId: "" }), samsung: () => samsungKey("KEY_SOURCE"), roku: () => rokuKey("InputTuner") },
+  volUp:   { lg: () => sendLg("ssap://audio/volumeUp"), samsung: () => samsungKey("KEY_VOLUP"), roku: () => rokuKey("VolumeUp") },
+  volDown: { lg: () => sendLg("ssap://audio/volumeDown"), samsung: () => samsungKey("KEY_VOLDOWN"), roku: () => rokuKey("VolumeDown") },
+  chUp:    { lg: () => sendLg("ssap://tv/channelUp"), samsung: () => samsungKey("KEY_CHUP"), roku: () => rokuKey("ChannelUp") },
+  chDown:  { lg: () => sendLg("ssap://tv/channelDown"), samsung: () => samsungKey("KEY_CHDOWN"), roku: () => rokuKey("ChannelDown") },
+  up:      { lg: () => lgButton("UP"), samsung: () => samsungKey("KEY_UP"), roku: () => rokuKey("Up") },
+  down:    { lg: () => lgButton("DOWN"), samsung: () => samsungKey("KEY_DOWN"), roku: () => rokuKey("Down") },
+  left:    { lg: () => lgButton("LEFT"), samsung: () => samsungKey("KEY_LEFT"), roku: () => rokuKey("Left") },
+  right:   { lg: () => lgButton("RIGHT"), samsung: () => samsungKey("KEY_RIGHT"), roku: () => rokuKey("Right") },
+  ok:      { lg: () => lgButton("ENTER"), samsung: () => samsungKey("KEY_ENTER"), roku: () => rokuKey("Select") },
+  back:    { lg: () => lgButton("BACK"), samsung: () => samsungKey("KEY_RETURN"), roku: () => rokuKey("Back") },
+  home:    { lg: () => sendLg("ssap://system.launcher/launch", { id: "com.webos.app.home" }), samsung: () => samsungKey("KEY_HOME"), roku: () => rokuKey("Home") }
+};
+const APP_IDS = {
+  lg:      { netflix: "netflix", youtube: "youtube.leanback.v4", prime: "amazon" },
+  samsung: { netflix: "KEY_NETFLIX", youtube: "KEY_YTV", prime: "KEY_PRIME_VIDEO" },
+  roku:    { netflix: "12", youtube: "837", prime: "13" }
+};
+
+function press(action){
+  if (!ws && !pointerWs){ log("Connect to your TV first."); return; }
+  const map = ACTIONS[action];
+  if (!map || !map[currentBrand]){ log("Not supported for this brand yet."); return; }
+  map[currentBrand]();
+}
+
+$("btnPower").onclick   = () => press("power");
+$("btnMute").onclick    = () => press("mute");
+$("btnInput").onclick   = () => press("input");
+$("btnVolUp").onclick   = () => press("volUp");
+$("btnVolDown").onclick = () => press("volDown");
+$("btnChUp").onclick    = () => press("chUp");
+$("btnChDown").onclick  = () => press("chDown");
+$("btnUp").onclick      = () => press("up");
+$("btnDown").onclick    = () => press("down");
+$("btnLeft").onclick    = () => press("left");
+$("btnRight").onclick   = () => press("right");
+$("btnOk").onclick      = () => press("ok");
+$("btnBack").onclick    = () => press("back");
+$("btnHome").onclick    = () => press("home");
+
+document.querySelectorAll(".apps button").forEach(btn => {
+  btn.onclick = () => {
+    if (!ws && !pointerWs){ log("Connect to your TV first."); return; }
+    const app = btn.dataset.app;
+    const ids = APP_IDS[currentBrand];
+    if (!ids){ log("App launch not supported for this brand yet."); return; }
+    if (currentBrand === "lg") sendLg("ssap://system.launcher/launch", { id: ids[app] });
+    else if (currentBrand === "samsung") samsungKey(ids[app]);
+    else if (currentBrand === "roku") rokuLaunch(ids[app]);
+    log(`Launching ${btn.textContent}…`);
+  };
+});
+
+/* ---------- init ---------- */
+selectBrand("lg");
+</script>
+</body>
+</html>
